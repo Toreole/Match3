@@ -1,7 +1,6 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 public partial class BoardController : Panel
 {
@@ -10,6 +9,8 @@ public partial class BoardController : Panel
 
 	[Export]
 	private Node gridContainer;
+	[Export]
+	private Label scoreLabel;
 
 	[Export]
 	private int boardSize = 10;
@@ -25,9 +26,15 @@ public partial class BoardController : Panel
 	private BoardToken[,] board;
 	Random rand = new();
 
+	private int score = 0;
+	private TokenType preferredToken;
+	private TokenType dislikedToken;
+
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
+		preferredToken = (TokenType)rand.Next(4);
+		dislikedToken = (TokenType)(((int)preferredToken + 2) % 4);
 		board = new BoardToken[boardSize, boardSize];
 		int i = 0, j = 0;
 		foreach (var child in gridContainer.GetChildren())
@@ -239,10 +246,11 @@ public partial class BoardController : Panel
 				{
 					totalSize = matchSize,
 					pos = new(posX, posY),
-					xSize = xsize+1,
-					ySize = ysize+1,
+					xSize = xsize + 1,
+					ySize = ysize + 1,
 					xOffset = xoffset,
-					yOffset = yoffset
+					yOffset = yoffset,
+					tokenType = matchType
 				});
 				GD.Print($"Found match around ({posX}, {posY}) with sizes ({xsize}, {ysize}) and token {matchType}");
 				if (xsize >= 2)
@@ -297,7 +305,26 @@ public partial class BoardController : Panel
 	//just grants scores and bonuses etc. depending on match type and match size.
 	private void ScoreMatches(List<TokenMatch> matches)
 	{
-		//TODO
+		foreach(var match in matches)
+		{
+			if (match.tokenType <= TokenType.Green)
+			{
+				score += (int)(multiplier(match.totalSize) * tokenMultiplier(match.tokenType) * match.totalSize * 10);
+			}
+		}
+		scoreLabel.Text = score.ToString();
+
+		float multiplier(int matchSize) => matchSize switch
+		{
+			3 => 1,
+			4 => 1.15f,
+			5 => 1.20f,
+			6 => 1.25f,
+			7 => 1.30f,
+			_ =>1,
+
+		};
+		float tokenMultiplier(TokenType t) => (t == preferredToken) ? 1.2f : (t == dislikedToken) ? 0.7f : 1f; 
 	}
 
 	//the list of matches can be used to generate a list of tokens to move down based on y positions.
@@ -339,6 +366,7 @@ public partial class BoardController : Panel
 	{
 		public Vector2I pos;
 		public int xOffset, yOffset, xSize, ySize, totalSize;
+		public TokenType tokenType;
 	}
 }
 
