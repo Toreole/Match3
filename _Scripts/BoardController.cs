@@ -27,6 +27,8 @@ public partial class BoardController : Panel
 	Random rand = new();
 
 	private int score = 0;
+	private int scoreMultiplierAccumulator = 0;
+	private float scoreMultiplier = 1;
 	private TokenType preferredToken;
 	private TokenType dislikedToken;
 
@@ -35,6 +37,8 @@ public partial class BoardController : Panel
 	{
 		preferredToken = (TokenType)rand.Next(4);
 		dislikedToken = (TokenType)(((int)preferredToken + 2) % 4);
+		GD.Print($"good: {preferredToken}, bad: {dislikedToken}");
+
 		board = new BoardToken[boardSize, boardSize];
 		int i = 0, j = 0;
 		foreach (var child in gridContainer.GetChildren())
@@ -309,10 +313,19 @@ public partial class BoardController : Panel
 		{
 			if (match.tokenType <= TokenType.Green)
 			{
-				score += (int)(multiplier(match.totalSize) * tokenMultiplier(match.tokenType) * match.totalSize * 10);
+				score += (int)(scoreMultiplier * multiplier(match.totalSize) * tokenMultiplier(match.tokenType) * match.totalSize * 10);
+			}
+			else if (match.tokenType == TokenType.Pink)
+			{
+				scoreMultiplierAccumulator += (int)(multiplier(match.totalSize) * match.totalSize * 5);
+				if(scoreMultiplierAccumulator > 30)
+				{
+					scoreMultiplierAccumulator -= 30;
+					scoreMultiplier += 0.25f;
+				}
 			}
 		}
-		scoreLabel.Text = score.ToString();
+		scoreLabel.Text = $"{score} (x{scoreMultiplier:0.00})";
 
 		float multiplier(int matchSize) => matchSize switch
 		{
