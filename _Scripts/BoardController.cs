@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 public partial class BoardController : Panel
 {
@@ -137,7 +138,7 @@ public partial class BoardController : Panel
 		draggedToken = token;
 	}
 
-	internal void EndTokenDrag(BoardToken target)
+	internal async Task EndTokenDrag(BoardToken target)
 	{
 		var startPos = draggedToken.GridPosition;
 		var endPos = target.GridPosition;
@@ -172,24 +173,27 @@ public partial class BoardController : Panel
 		if (matches.Count > 0)
 		{
 			ScoreMatches(matches);
-			ApplyGravity(matches);
-			RefillEmptyTiles();
+			await ApplyGravity(matches);
+			await RefillEmptyTiles();
 
 			//continue chains as long as matches exist.
 			int iteration = 0;
 			while (matches.Count > 0)
 			{
+				await Task.Delay(600);
 				GD.Print($"FindAllMatches({iteration++})");
 				matches = FindAllMatches();
 				ScoreMatches(matches);
-				ApplyGravity(matches);
-				RefillEmptyTiles();
+				await ApplyGravity(matches);
+				await RefillEmptyTiles();
 			}
 
 		}
 	}
 
 	//finds ALL matches on the board.
+	//important note: this does NOT maximize match sizes!
+	//if some tokens drop into a n L shape (5-match), it will only find one direction, and leave the other 2 tokens intact.
 	private List<TokenMatch> FindAllMatches()
 	{
 		List<TokenMatch> matches = new(boardSize * 3);
@@ -240,9 +244,11 @@ public partial class BoardController : Panel
 				ysize++;
 
 			bool isMatch = ysize >= 2 || xsize >= 2;
-			
+			//reset sizes to 0 if not a match in that direction.
+			if (ysize < 2) ysize = 0;
+			if (xsize < 2) xsize = 0;
 			//matchType and matchSize together determine what you get for a match.
-			int matchSize = isMatch ? 1+(ysize >= 2 ? ysize: 0)+(xsize >= 2 ? xsize : 0) : 0;
+			int matchSize = 1 + ysize + xsize;
 
 			if(isMatch)
 			{
@@ -278,15 +284,12 @@ public partial class BoardController : Panel
 					}
 				}
 			}
-
-			posX += xdirection;
-			posY += ydirection;
 		}
 		return matches;
 	}
 
 	//searches through the rows and randomizes any empty tiles as other tokens.
-	private void RefillEmptyTiles()
+	private async Task RefillEmptyTiles()
 	{
 		bool rowHadEmpty;
 		for(int y = 0; y < boardSize; y++)
@@ -299,11 +302,13 @@ public partial class BoardController : Panel
 					board[x, y].SelfModulate = GetRandomTokenColor(out var tokenType);
 					board[x, y].TokenType = tokenType;
 					rowHadEmpty = true;
+					await Task.Delay(200);
 				}
 			}
 			if (!rowHadEmpty)
 				return;
 		}
+		await Task.Delay(1000);
 	}
 
 	//just grants scores and bonuses etc. depending on match type and match size.
@@ -341,8 +346,9 @@ public partial class BoardController : Panel
 	}
 
 	//the list of matches can be used to generate a list of tokens to move down based on y positions.
-	private void ApplyGravity(List<TokenMatch> matches)
+	private async Task ApplyGravity(List<TokenMatch> matches)
 	{
+		await Task.Delay(600);
 		matches.Sort((a, b) => a.pos.Y.CompareTo(b.pos.Y));
 		//move tokens above the match down by the matches (ysize + 1)
 		foreach(var match in matches)
@@ -371,6 +377,7 @@ public partial class BoardController : Panel
 						board[x, y].SelfModulate = Color.FromHsv(0, 0, 1);
 					}
 				}
+				await Task.Delay(600);
 			}
 		}
 	}
