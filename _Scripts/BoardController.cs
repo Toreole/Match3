@@ -157,13 +157,36 @@ public partial class BoardController : Panel
 		target.SelfModulate = tokenColor;
 		target.TokenType = tokenType;
 
-		var matches = FindCombinations(startPos, endPos);
+		var matches = FindMatches(startPos, endPos);
 		if (matches.Count > 0)
 		{
 			ScoreMatches(matches);
 			ApplyGravity(matches);
 			RefillEmptyTiles();
+
+			//continue chains as long as matches exist.
+			int iteration = 0;
+			while (matches.Count > 0)
+			{
+				GD.Print($"FindAllMatches({iteration++})");
+				matches = FindAllMatches();
+				ScoreMatches(matches);
+				ApplyGravity(matches);
+				RefillEmptyTiles();
+			}
+
 		}
+	}
+
+	//finds ALL matches on the board.
+	private List<TokenMatch> FindAllMatches()
+	{
+		List<TokenMatch> matches = new(boardSize * 3);
+		for(int x = 0; x < boardSize; x++)
+		{
+			matches.AddRange(FindMatches(new(x, 0), new(x, boardSize - 1)));
+		}
+		return matches;
 	}
 
 	/// <summary>
@@ -171,7 +194,7 @@ public partial class BoardController : Panel
 	/// </summary>
 	/// <param name="start"></param>
 	/// <param name="end"></param>
-	private List<TokenMatch> FindCombinations(Vector2I start, Vector2I end)
+	private List<TokenMatch> FindMatches(Vector2I start, Vector2I end)
 	{
 		var offset = end - start;
 		int distance = Mathf.Abs(offset.X) + Mathf.Abs(offset.Y);
@@ -192,7 +215,7 @@ public partial class BoardController : Panel
 			if (matchType == TokenType.Empty)
 				continue;
 
-			GD.Print($"check for match in ({posX}, {posY})");
+			//GD.Print($"check for match in ({posX}, {posY})");
 			for (int x = posX - 1; x >= 0 && board[x, posY].TokenType == matchType; x--)
 				xsize++;
 			int xoffset = -xsize;
@@ -227,7 +250,7 @@ public partial class BoardController : Panel
 					for(int dx = 0; dx <= xsize; dx++)
 					{
 						int x = posX + xoffset + dx;
-						GD.Print($"empty ({x}, {start.Y})");
+						//GD.Print($"empty ({x}, {start.Y})");
 						board[x, posY].TokenType = TokenType.Empty;
 						board[x, posY].SelfModulate = Color.FromHsv(0, 0, 1);
 					}
@@ -237,7 +260,7 @@ public partial class BoardController : Panel
 					for (int dy = 0; dy <= ysize; dy++)
 					{
 						int y = posY + yoffset + dy;
-						GD.Print($"empty ({start.X}, {y})");
+						//GD.Print($"empty ({start.X}, {y})");
 						board[posX, y].TokenType = TokenType.Empty;
 						board[posX, y].SelfModulate = Color.FromHsv(0, 0, 1);
 					}
@@ -250,6 +273,7 @@ public partial class BoardController : Panel
 		return matches;
 	}
 
+	//searches through the rows and randomizes any empty tiles as other tokens.
 	private void RefillEmptyTiles()
 	{
 		bool rowHadEmpty;
