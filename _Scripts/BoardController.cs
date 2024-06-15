@@ -1,5 +1,7 @@
 using Godot;
 using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 public partial class BoardController : Panel
 {
@@ -155,43 +157,71 @@ public partial class BoardController : Panel
 		target.SelfModulate = tokenColor;
 		target.TokenType = tokenType;
 
-		FindCombinations(startPos, endPos);
+		var matches = FindCombinations(startPos, endPos);
+		if (matches.Count > 0)
+		{
+			ScoreMatches(matches);
+			ApplyGravity(matches);
+			RefillEmptyTiles();
+		}
 	}
 
-	private void FindCombinations(Vector2I start, Vector2I end)
+	/// <summary>
+	/// finds matches on a line (based on a move) and marks matched tokens as "Empty"
+	/// </summary>
+	/// <param name="start"></param>
+	/// <param name="end"></param>
+	private List<TokenMatch> FindCombinations(Vector2I start, Vector2I end)
 	{
-		int distance = Mathf.Abs(end.X - start.X) + Mathf.Abs(end.Y - start.Y);
-		int xdirection = Mathf.Sign(end.X - start.X);
-		int ydirection = Mathf.Sign(end.Y - start.Y);
-		int posX = start.X;
-		int posY = start.Y;
+		var offset = end - start;
+		int distance = Mathf.Abs(offset.X) + Mathf.Abs(offset.Y);
+		List<TokenMatch> matches = new(distance);
+		int xdirection = Mathf.Sign(offset.X);
+		int ydirection = Mathf.Sign(offset.Y);
+		int posX, posY;
+		int xsize,ysize;
 
 		for (int i = 0; i <= distance; i++)
 		{
-			int ysize = 0;
-			int xsize = 0;
-			var currentToken = board[posX, posY].TokenType;
+			xsize = 0;
+			ysize = 0;
+			posX = start.X + xdirection * i;
+			posY = start.Y + ydirection * i;
+			var matchType = board[posX, posY].TokenType;
+
+			if (matchType == TokenType.Empty)
+				continue;
 
 			GD.Print($"check for match in ({posX}, {posY})");
-			for (int x = posX - 1; x >= 0 && board[x, posY].TokenType == currentToken; x--)
+			for (int x = posX - 1; x >= 0 && board[x, posY].TokenType == matchType; x--)
 				xsize++;
 			int xoffset = -xsize;
-			for (int x = posX + 1; x < boardSize && board[x, posY].TokenType == currentToken; x++)
+			for (int x = posX + 1; x < boardSize && board[x, posY].TokenType == matchType; x++)
 				xsize++;
 
-			for (int y = posY - 1; y >= 0 && board[posX, y].TokenType == currentToken; y--)
+			for (int y = posY - 1; y >= 0 && board[posX, y].TokenType == matchType; y--)
 				ysize++;
 			int yoffset = -ysize;
-			for (int y = posY + 1; y < boardSize && board[posX, y].TokenType == currentToken; y++)
+			for (int y = posY + 1; y < boardSize && board[posX, y].TokenType == matchType; y++)
 				ysize++;
 
 			bool isMatch = ysize >= 2 || xsize >= 2;
-
+			
+			//matchType and matchSize together determine what you get for a match.
 			int matchSize = isMatch ? 1+(ysize >= 2 ? ysize: 0)+(xsize >= 2 ? xsize : 0) : 0;
 
 			if(isMatch)
 			{
-				GD.Print($"Found match around ({posX}, {posY}) with sizes ({xsize}, {ysize}) and token {currentToken}");
+				matches.Add(new()
+				{
+					totalSize = matchSize,
+					pos = new(posX, posY),
+					xSize = xsize+1,
+					ySize = ysize+1,
+					xOffset = xoffset,
+					yOffset = yoffset
+				});
+				GD.Print($"Found match around ({posX}, {posY}) with sizes ({xsize}, {ysize}) and token {matchType}");
 				if (xsize >= 2)
 				{
 					for(int dx = 0; dx <= xsize; dx++)
@@ -217,9 +247,77 @@ public partial class BoardController : Panel
 			posX += xdirection;
 			posY += ydirection;
 		}
+		return matches;
 	}
 
+	private void RefillEmptyTiles()
+	{
+		bool rowHadEmpty;
+		for(int y = 0; y < boardSize; y++)
+		{
+			rowHadEmpty = false;
+			for(int x = 0; x < boardSize; x++)
+			{
+				if (board[x,y].TokenType == TokenType.Empty)
+				{
+					board[x, y].SelfModulate = GetRandomTokenColor(out var tokenType);
+					board[x, y].TokenType = tokenType;
+					rowHadEmpty = true;
+				}
+			}
+			if (!rowHadEmpty)
+				return;
+		}
+	}
+
+	//just grants scores and bonuses etc. depending on match type and match size.
+	private void ScoreMatches(List<TokenMatch> matches)
+	{
+		//TODO
+	}
+
+	//the list of matches can be used to generate a list of tokens to move down based on y positions.
+	private void ApplyGravity(List<TokenMatch> matches)
+	{
+		matches.Sort((a, b) => a.pos.Y.CompareTo(b.pos.Y));
+		//move tokens above the match down by the matches (ysize + 1)
+		foreach(var match in matches)
+		{
+			for(int x = match.pos.X + match.xOffset; x < match.pos.X + match.xOffset + match.xSize; x++)
+			{
+				if (x == match.pos.X)
+				{
+					for (int y = match.pos.Y + match.yOffset - 1; y >= 0; y--)
+					{
+						board[x, y + match.ySize].TokenType = board[x, y].TokenType;
+						board[x, y + match.ySize].SelfModulate = board[x, y].SelfModulate;
+
+						board[x, y].TokenType = TokenType.Empty;
+						board[x, y].SelfModulate = Color.FromHsv(0, 0, 1);
+					}
+				}
+				else
+				{
+					for (int y = match.pos.Y - 1; y >= 0; y--)
+					{
+						board[x, y + 1].TokenType = board[x, y].TokenType;
+						board[x, y + 1].SelfModulate = board[x, y].SelfModulate;
+
+						board[x, y].TokenType = TokenType.Empty;
+						board[x, y].SelfModulate = Color.FromHsv(0, 0, 1);
+					}
+				}
+			}
+		}
+	}
+
+	private struct TokenMatch
+	{
+		public Vector2I pos;
+		public int xOffset, yOffset, xSize, ySize, totalSize;
+	}
 }
+
 
 public enum TokenType
 {
