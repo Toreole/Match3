@@ -1,3 +1,7 @@
 [gd_resource type="Theme" format=3 uid="uid://daax13gfe2h3s"]
 
 [resource]
+/constants/h_separation = 78
+/constants/v_separation = 70
+GridContainer/constants/h_separation = 2
+GridContainer/constants/v_separation = 2

@@ -33,6 +33,8 @@ public partial class BoardController : Panel
 	private TokenType preferredToken;
 	private TokenType dislikedToken;
 
+	private bool acceptsInput = true;
+
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
@@ -66,6 +68,15 @@ public partial class BoardController : Panel
 			tile.TokenType = t;
 		}
 
+		TextureRect rec = new();
+		rec.Texture = tokenTexture;
+		rec.SelfModulate = Color.FromHsv(0, 0, 0);
+		AddChild(rec);
+		rec.Position = new Vector2(200, 200);
+
+		var tween = GetTree().CreateTween();
+		tween.TweenProperty(rec, "position", new Vector2(500, 500), 1).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.In);
+		tween.TweenCallback(Callable.From(rec.QueueFree)).SetDelay(4);
 	}
 
 	private Color GetRandomTokenColor(out TokenType tokenType)
@@ -140,6 +151,8 @@ public partial class BoardController : Panel
 
 	internal async Task EndTokenDrag(BoardToken target)
 	{
+		if (!acceptsInput)
+			return;
 		var startPos = draggedToken.GridPosition;
 		var endPos = target.GridPosition;
 
@@ -150,6 +163,7 @@ public partial class BoardController : Panel
 		var tokenColor = draggedToken.SelfModulate;
 		var tokenType = draggedToken.TokenType;
 
+		acceptsInput = false;
 		GD.Print($"moving {startPos} to {endPos}");
 
 		// because one is always 0.
@@ -189,6 +203,7 @@ public partial class BoardController : Panel
 			}
 
 		}
+		acceptsInput = true;
 	}
 
 	//finds ALL matches on the board.

@@ -14,6 +14,13 @@ config/name="Match 3"
 config/features=PackedStringArray("4.2", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
+[display]
+
+window/size/viewport_width=1200
+window/size/viewport_height=700
+window/size/resizable=false
+window/stretch/aspect="expand"
+
 [dotnet]
 
 project/assembly_name="Match 3"
