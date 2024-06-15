@@ -259,9 +259,9 @@ public partial class BoardController : Panel
 				ysize++;
 
 			bool isMatch = ysize >= 2 || xsize >= 2;
-			//reset sizes to 0 if not a match in that direction.
-			if (ysize < 2) ysize = 0;
-			if (xsize < 2) xsize = 0;
+			//reset sizes and offset to 0 if not a match in that direction.
+			if (ysize < 2) { ysize = 0; yoffset = 0; }
+			if (xsize < 2) { xsize = 0; xoffset = 0; }
 			//matchType and matchSize together determine what you get for a match.
 			int matchSize = 1 + ysize + xsize;
 
