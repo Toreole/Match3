@@ -17,3 +17,9 @@ config/icon="res://icon.svg"
 [dotnet]
 
 project/assembly_name="Match 3"
+
+[file_customization]
+
+folder_colors={
+"res://_Scenes/": "green"
+}
