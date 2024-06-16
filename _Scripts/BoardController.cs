@@ -76,6 +76,9 @@ public partial class BoardController : Panel
 			tile.BoardController = this;
 			tile.Texture = tokenTexture;
 			tile.Size = new Vector2(tileSize, tileSize);
+			tile.MouseEntered += () => SetCurrentHover(tile);
+
+			//initialize gameplay stuff. to be moved elsewhere
 			tile.SelfModulate = GetRandomTokenColor(out var t);
 			tile.TokenType = t;
 		}
@@ -150,7 +153,7 @@ public partial class BoardController : Panel
 		}
 	}
 
-	BoardToken draggedToken;
+	private BoardToken draggedToken;
 
 	internal void StartTokenDrag(BoardToken token)
 	{
@@ -163,7 +166,7 @@ public partial class BoardController : Panel
 
 	internal async Task EndTokenDrag(BoardToken target)
 	{
-		if (!acceptsInput)
+		if (!acceptsInput || draggedToken == null)
 			return;
 
 		imposter.Visible = false;
@@ -218,6 +221,7 @@ public partial class BoardController : Panel
 
 		}
 		acceptsInput = true;
+		draggedToken = null;
 	}
 
 	//finds ALL matches on the board.

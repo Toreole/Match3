@@ -9,31 +9,6 @@ public partial class BoardToken : TextureRect
 	internal Vector2I GridPosition { get; set; }
 	internal TokenType TokenType { get; set; }
 
-	// Called every frame. 'delta' is the elapsed time since the previous frame.
-	public override void _Process(double delta)
-	{
-
-	}
-
-	public override void _GuiInput(InputEvent @event)
-	{
-		base._GuiInput(@event);
-		if(@event is InputEventMouseButton mouse)
-		{
-			if(mouse.IsPressed())
-			{
-				GD.Print($"Start on {this.Name}");
-			}
-			else
-			{
-				GD.Print($"End on {this.Name}");
-			}
-		}
-		if (@event is InputEventMouseMotion motion)
-		{
-			this.BoardController.SetCurrentHover(this);
-		}
-	}
 	public override Variant _GetDragData(Vector2 atPosition)
 	{
 		BoardController.StartTokenDrag(this);
@@ -49,7 +24,7 @@ public partial class BoardToken : TextureRect
 		if(data.VariantType == Variant.Type.StringName)
 		{
 			GD.Print($"{Name}: drop received from {data.AsString()}");
-			BoardController.EndTokenDrag(this);
+			BoardController.EndTokenDrag(this).ConfigureAwait(false);
 		}
 	}
 
