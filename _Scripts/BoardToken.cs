@@ -29,6 +29,10 @@ public partial class BoardToken : TextureRect
 				GD.Print($"End on {this.Name}");
 			}
 		}
+		if (@event is InputEventMouseMotion motion)
+		{
+			this.BoardController.SetCurrentHover(this);
+		}
 	}
 	public override Variant _GetDragData(Vector2 atPosition)
 	{
@@ -44,8 +48,8 @@ public partial class BoardToken : TextureRect
 	{
 		if(data.VariantType == Variant.Type.StringName)
 		{
-			BoardController.EndTokenDrag(this);
 			GD.Print($"{Name}: drop received from {data.AsString()}");
+			BoardController.EndTokenDrag(this);
 		}
 	}
 

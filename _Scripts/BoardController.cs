@@ -352,7 +352,7 @@ public partial class BoardController : Panel
 			else if (match.tokenType == TokenType.Pink)
 			{
 				scoreMultiplierAccumulator += (int)(multiplier(match.totalSize) * match.totalSize * 5);
-				if(scoreMultiplierAccumulator > 30)
+				while(scoreMultiplierAccumulator > 30)
 				{
 					scoreMultiplierAccumulator -= 30;
 					scoreMultiplier += 0.25f;
@@ -408,6 +408,19 @@ public partial class BoardController : Panel
 				}
 				await Task.Delay(600);
 			}
+		}
+	}
+
+	BoardToken hoveringTile = null;
+	internal void SetCurrentHover(BoardToken tile)
+	{
+		if (hoveringTile != tile)
+		{
+			if (hoveringTile != null)
+				hoveringTile.Modulate = Color.FromHsv(0, 0, 1f);
+			hoveringTile = tile;
+			hoveringTile.Modulate = Color.FromHsv(0, 0, 0.8f);
+			GD.Print($"Now hovering over {tile.Name}");
 		}
 	}
 

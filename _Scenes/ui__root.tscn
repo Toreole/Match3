@@ -568,8 +568,10 @@ script = ExtResource("4_a6dl2")
 
 [node name="ScoreLabel" type="Label" parent="."]
 layout_mode = 0
-offset_right = 125.0
-offset_bottom = 62.0
+offset_left = 174.0
+offset_top = 223.0
+offset_right = 315.0
+offset_bottom = 285.0
 text = "0000000"
 label_settings = SubResource("LabelSettings_n7ypw")
 
