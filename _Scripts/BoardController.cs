@@ -25,7 +25,8 @@ public partial class BoardController : Panel
 
 	private int weightTotal;
 	private BoardToken[,] board;
-	Random rand = new();
+	// using the Godot class for its .State property.
+	private RandomNumberGenerator rand = new();
 
 	private int score = 0;
 	private int scoreMultiplierAccumulator = 0;
@@ -35,10 +36,21 @@ public partial class BoardController : Panel
 
 	private bool acceptsInput = true;
 
+	private TextureRect imposter;
+
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
-		preferredToken = (TokenType)rand.Next(4);
+		imposter = new();
+		this.AddChild(imposter);
+		imposter.Texture = tokenTexture;
+		imposter.MouseFilter = MouseFilterEnum.Ignore;
+		imposter.CustomMinimumSize = new(50, 50);
+		imposter.StretchMode = TextureRect.StretchModeEnum.KeepAspect;
+		imposter.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
+		imposter.Visible = false;
+
+		preferredToken = (TokenType)rand.RandiRange(0, 3);
 		dislikedToken = (TokenType)(((int)preferredToken + 2) % 4);
 		GD.Print($"good: {preferredToken}, bad: {dislikedToken}");
 
@@ -81,7 +93,7 @@ public partial class BoardController : Panel
 
 	private Color GetRandomTokenColor(out TokenType tokenType)
 	{
-		int r = rand.Next(weightTotal);
+		int r = rand.RandiRange(0, weightTotal+1);
 		for (int i = 0; i < tokenWeights.Length; i++)
 		{
 			r -= tokenWeights[i];
@@ -100,11 +112,7 @@ public partial class BoardController : Panel
 	{
 		//if (dragging)
 		//this.GlobalPosition = GetGlobalMousePosition() + mouseOffset + ((float)delta * mouseVelocity);
-	}
-
-	public override Variant _GetDragData(Vector2 atPosition)
-	{
-		return (Variant)(int)TokenType.Green;
+		imposter.GlobalPosition = GetGlobalMousePosition() - new Vector2(25, 25);
 	}
 
 	private Vector2 mouseOffset;
@@ -146,13 +154,19 @@ public partial class BoardController : Panel
 
 	internal void StartTokenDrag(BoardToken token)
 	{
+		if (!acceptsInput)
+			return;
 		draggedToken = token;
+		imposter.Visible = true;
+		imposter.SelfModulate = draggedToken.SelfModulate;
 	}
 
 	internal async Task EndTokenDrag(BoardToken target)
 	{
 		if (!acceptsInput)
 			return;
+
+		imposter.Visible = false;
 		var startPos = draggedToken.GridPosition;
 		var endPos = target.GridPosition;
 
@@ -394,6 +408,30 @@ public partial class BoardController : Panel
 				}
 				await Task.Delay(600);
 			}
+		}
+	}
+
+	private TokenType[,] snapshot;
+	private ulong randomState;
+
+	public void _OnSnapshotButtonDown()
+	{
+		snapshot = new TokenType[boardSize, boardSize];
+		for (int x = 0; x < boardSize; x++)
+			for (int y = 0; y < boardSize; y++)
+				snapshot[x, y] = board[x, y].TokenType;
+		randomState = rand.State;
+	}
+
+	public void _OnReloadButtonDown()
+	{
+		if (!acceptsInput)
+			return;
+		rand.State = randomState;
+		foreach(var tile in board)
+		{
+			tile.TokenType = snapshot[tile.GridPosition.X, tile.GridPosition.Y];
+			tile.SelfModulate = this.tokenColors[(int)tile.TokenType];
 		}
 	}
 

@@ -572,3 +572,22 @@ offset_right = 125.0
 offset_bottom = 62.0
 text = "0000000"
 label_settings = SubResource("LabelSettings_n7ypw")
+
+[node name="SnapshotButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 171.0
+offset_top = 136.0
+offset_right = 313.0
+offset_bottom = 172.0
+text = "Snapshot State"
+
+[node name="ReloadButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 171.0
+offset_top = 178.0
+offset_right = 313.0
+offset_bottom = 214.0
+text = "Reload Snapshot"
+
+[connection signal="button_down" from="SnapshotButton" to="Board_Area" method="_OnSnapshotButtonDown"]
+[connection signal="button_down" from="ReloadButton" to="Board_Area" method="_OnReloadButtonDown"]
