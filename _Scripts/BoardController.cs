@@ -63,7 +63,7 @@ public partial class BoardController : Panel
 			board[i++, j] = c;
 			if (i == boardSize)
 			{
-				i = 0; 
+				i = 0;
 				j++;
 			}
 		}
@@ -82,20 +82,6 @@ public partial class BoardController : Panel
 			tile.SelfModulate = GetRandomTokenColor(out var t);
 			tile.TokenType = t;
 		}
-
-
-		//this is a test for tweening.
-		TextureRect rec = new()
-		{
-			Texture = tokenTexture,
-			SelfModulate = Color.FromHsv(0, 0, 0),
-			Position = new Vector2(200, 200)
-		};
-		AddChild(rec);
-
-		var tween = GetTree().CreateTween();
-		tween.TweenProperty(rec, "position", new Vector2(500, 500), 1).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.In);
-		tween.TweenCallback(Callable.From(rec.QueueFree)).SetDelay(4);
 	}
 
 	private Color GetRandomTokenColor(out TokenType tokenType)
