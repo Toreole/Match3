@@ -83,11 +83,15 @@ public partial class BoardController : Panel
 			tile.TokenType = t;
 		}
 
-		TextureRect rec = new();
-		rec.Texture = tokenTexture;
-		rec.SelfModulate = Color.FromHsv(0, 0, 0);
+
+		//this is a test for tweening.
+		TextureRect rec = new()
+		{
+			Texture = tokenTexture,
+			SelfModulate = Color.FromHsv(0, 0, 0),
+			Position = new Vector2(200, 200)
+		};
 		AddChild(rec);
-		rec.Position = new Vector2(200, 200);
 
 		var tween = GetTree().CreateTween();
 		tween.TweenProperty(rec, "position", new Vector2(500, 500), 1).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.In);
@@ -303,7 +307,7 @@ public partial class BoardController : Panel
 						int x = posX + xoffset + dx;
 						//GD.Print($"empty ({x}, {start.Y})");
 						board[x, posY].TokenType = TokenType.Empty;
-						board[x, posY].SelfModulate = Color.FromHsv(0, 0, 1);
+						board[x, posY].SelfModulate = Color.FromHsv(0, 0, 0, 0);
 					}
 				}
 				if (ysize >= 2)
@@ -313,7 +317,7 @@ public partial class BoardController : Panel
 						int y = posY + yoffset + dy;
 						//GD.Print($"empty ({start.X}, {y})");
 						board[posX, y].TokenType = TokenType.Empty;
-						board[posX, y].SelfModulate = Color.FromHsv(0, 0, 1);
+						board[posX, y].SelfModulate = Color.FromHsv(0, 0, 0 ,0);
 					}
 				}
 			}
@@ -332,10 +336,29 @@ public partial class BoardController : Panel
 			{
 				if (board[x,y].TokenType == TokenType.Empty)
 				{
-					board[x, y].SelfModulate = GetRandomTokenColor(out var tokenType);
-					board[x, y].TokenType = tokenType;
+					var tokenColor = GetRandomTokenColor(out var tokenType);
+					//tween in a new token
+					TextureRect rec = new()
+					{
+						Texture = tokenTexture,
+						SelfModulate = tokenColor,
+						CustomMinimumSize = board[x,y].CustomMinimumSize,
+						StretchMode = board[x,y].StretchMode,
+						ExpandMode = board[x,y].ExpandMode,
+					};
+					AddChild(rec);
+					rec.GlobalPosition = board[x, y].GlobalPosition + new Vector2(0, -500);
+					var tween = GetTree().CreateTween();
+					tween.TweenProperty(rec, "global_position", board[x, y].GlobalPosition, 0.8f).SetEase(Tween.EaseType.InOut).SetTrans(Tween.TransitionType.Sine);
+					tween.TweenCallback(Callable.From(rec.QueueFree));
+					int bufferx = x, buffery = y;
+					tween.TweenCallback(Callable.From(() => {
+						board[bufferx, buffery].SelfModulate = tokenColor;
+						board[bufferx, buffery].TokenType = tokenType;
+					}));
+
 					rowHadEmpty = true;
-					await Task.Delay(200);
+					//await Task.Delay(200);
 				}
 			}
 			if (!rowHadEmpty)
@@ -396,7 +419,7 @@ public partial class BoardController : Panel
 						board[x, y + match.ySize].SelfModulate = board[x, y].SelfModulate;
 
 						board[x, y].TokenType = TokenType.Empty;
-						board[x, y].SelfModulate = Color.FromHsv(0, 0, 1);
+						board[x, y].SelfModulate = Color.FromHsv(0, 0, 0 ,0);
 					}
 				}
 				else
@@ -407,7 +430,7 @@ public partial class BoardController : Panel
 						board[x, y + 1].SelfModulate = board[x, y].SelfModulate;
 
 						board[x, y].TokenType = TokenType.Empty;
-						board[x, y].SelfModulate = Color.FromHsv(0, 0, 1);
+						board[x, y].SelfModulate = Color.FromHsv(0, 0, 0, 0);
 					}
 				}
 				await Task.Delay(600);
@@ -418,13 +441,20 @@ public partial class BoardController : Panel
 	BoardToken hoveringTile = null;
 	internal void SetCurrentHover(BoardToken tile)
 	{
-		if (hoveringTile != tile)
+		if (draggedToken == null)
 		{
-			if (hoveringTile != null)
-				hoveringTile.Modulate = Color.FromHsv(0, 0, 1f);
-			hoveringTile = tile;
-			hoveringTile.Modulate = Color.FromHsv(0, 0, 0.8f);
-			GD.Print($"Now hovering over {tile.Name}");
+			if (hoveringTile != tile)
+			{
+				if (hoveringTile != null)
+					hoveringTile.Modulate = Color.FromHsv(0, 0, 1f);
+				hoveringTile = tile;
+				hoveringTile.Modulate = Color.FromHsv(0, 0, 0.8f);
+				GD.Print($"Now hovering over {tile.Name}");
+			}
+		}
+		else // currently dragging a token.
+		{
+
 		}
 	}
 
