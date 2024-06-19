@@ -416,14 +416,17 @@ public partial class BoardController : Panel
 		{
 			for(int x = match.pos.X + match.xOffset; x < match.pos.X + match.xOffset + match.xSize; x++)
 			{
-				for (int y = match.pos.Y + ((x == match.pos.X) ? match.yOffset : 0) - 1; y >= 0; y--)
+				bool isMatchX = x == match.pos.X;
+				for (int y = match.pos.Y + (isMatchX ? match.yOffset : 0) - 1; y >= 0; y--)
 				{
 					var rec = CreateUninteractableTokenAsChild();
 					rec.SelfModulate = board[x, y].SelfModulate;
 					rec.GlobalPosition = board[x, y].GlobalPosition;
 
-					int xbuffer = x, ybuffer = y + ((x == match.pos.X)? match.ySize : 1);
+					int xbuffer = x, ybuffer = y + (isMatchX ? match.ySize : 1);
 					var tokenType = board[x, y].TokenType;
+					if (tokenType == TokenType.Empty)
+						continue;
 
 					var tween = GetTree().CreateTween();
 					tween.TweenProperty(rec, "global_position", board[xbuffer, ybuffer].GlobalPosition, 0.2)
