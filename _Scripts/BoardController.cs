@@ -38,6 +38,12 @@ public partial class BoardController : Panel
 
 	private TextureRect imposter;
 
+	private TokenType[,] snapshot;
+	private ulong randomState;
+
+	BoardToken hoveringTile = null;
+	private BoardToken draggedToken = null;
+
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
@@ -108,42 +114,15 @@ public partial class BoardController : Panel
 		imposter.GlobalPosition = GetGlobalMousePosition() - new Vector2(25, 25);
 	}
 
-	private Vector2 mouseOffset;
-	private Vector2 mouseVelocity;
-	private bool dragging = false;
-
 	public override void _Input(InputEvent @event)
 	{
 		base._Input(@event);
-		if (@event is InputEventMouseButton mouse)
-		{
-			//GD.Print("mouse: " + mouse.IsPressed());
-			if(dragging && !mouse.IsPressed())
-			{
-				dragging = false;
-			}
-		}
-		if (@event is InputEventMouseMotion motion)
-		{
-			mouseVelocity = motion.Velocity;
-		}
 	}
 
 	public override void _GuiInput(InputEvent @event)
 	{
 		base._GuiInput(@event);
-		if( @event is InputEventMouseButton mouse)
-		{
-			GD.Print(mouse.AsText());
-			if(mouse.IsPressed())
-			{
-				this.mouseOffset = this.GlobalPosition - mouse.GlobalPosition;
-				dragging = true;
-			}
-		}
 	}
-
-	private BoardToken draggedToken;
 
 	internal void StartTokenDrag(BoardToken token)
 	{
@@ -159,19 +138,29 @@ public partial class BoardController : Panel
 		if (!acceptsInput || draggedToken == null)
 			return;
 
+		foreach (var pair in tempVisTokens)
+		{
+			pair.Key.SelfModulate = tokenColors[(int)pair.Key.TokenType];
+			pair.Value.fakeVisual.QueueFree();
+		}
+		tempVisTokens.Clear();
+
 		imposter.Visible = false;
 		var startPos = draggedToken.GridPosition;
 		var endPos = target.GridPosition;
 
+		GD.Print($"try moving {startPos} to {endPos}");
 		//same position, or they dont share any coordinate
 		if (startPos == endPos || (startPos.X != endPos.X && startPos.Y != endPos.Y))
+		{
+			draggedToken = null;
 			return;
+		}
 
 		var tokenColor = draggedToken.SelfModulate;
 		var tokenType = draggedToken.TokenType;
 
 		acceptsInput = false;
-		GD.Print($"moving {startPos} to {endPos}");
 
 		// because one is always 0.
 		int distance = Mathf.Abs(endPos.X - startPos.X) + Mathf.Abs(endPos.Y - startPos.Y);
@@ -292,8 +281,7 @@ public partial class BoardController : Panel
 					{
 						int x = posX + xoffset + dx;
 						//GD.Print($"empty ({x}, {start.Y})");
-						board[x, posY].TokenType = TokenType.Empty;
-						board[x, posY].SelfModulate = Color.FromHsv(0, 0, 0, 0);
+						EmptyTile(x, posY);
 					}
 				}
 				if (ysize >= 2)
@@ -302,8 +290,7 @@ public partial class BoardController : Panel
 					{
 						int y = posY + yoffset + dy;
 						//GD.Print($"empty ({start.X}, {y})");
-						board[posX, y].TokenType = TokenType.Empty;
-						board[posX, y].SelfModulate = Color.FromHsv(0, 0, 0 ,0);
+						EmptyTile(posX, y);
 					}
 				}
 			}
@@ -404,8 +391,7 @@ public partial class BoardController : Panel
 						board[x, y + match.ySize].TokenType = board[x, y].TokenType;
 						board[x, y + match.ySize].SelfModulate = board[x, y].SelfModulate;
 
-						board[x, y].TokenType = TokenType.Empty;
-						board[x, y].SelfModulate = Color.FromHsv(0, 0, 0 ,0);
+						EmptyTile(x, y);
 					}
 				}
 				else
@@ -414,9 +400,7 @@ public partial class BoardController : Panel
 					{
 						board[x, y + 1].TokenType = board[x, y].TokenType;
 						board[x, y + 1].SelfModulate = board[x, y].SelfModulate;
-
-						board[x, y].TokenType = TokenType.Empty;
-						board[x, y].SelfModulate = Color.FromHsv(0, 0, 0, 0);
+						EmptyTile(x, y);
 					}
 				}
 				await Task.Delay(600);
@@ -424,7 +408,14 @@ public partial class BoardController : Panel
 		}
 	}
 
-	BoardToken hoveringTile = null;
+	private void EmptyTile(int x, int y)
+	{
+		board[x, y].TokenType = TokenType.Empty;
+		board[x, y].SelfModulate = Color.FromHsv(0, 0, 0, 0);
+	}
+
+	private Dictionary<BoardToken, TempVisToken> tempVisTokens = new();
+
 	internal void SetCurrentHover(BoardToken tile)
 	{
 		if (draggedToken == null)
@@ -438,16 +429,143 @@ public partial class BoardController : Panel
 				GD.Print($"Now hovering over {tile.Name}");
 			}
 		}
-		else // currently dragging a token.
+		else if (acceptsInput) // currently dragging a token. animate other tokens on its path to preemptively move
 		{
+			var dragStartPos = draggedToken.GridPosition;
+			var hoverPosition = tile.GridPosition;
 
+			//skip if they dont share a lane.
+			if (dragStartPos.X != hoverPosition.X && dragStartPos.Y != hoverPosition.Y)
+			{
+				// BIG TODO:
+				//foreach (var visToken in tempVisTokens.Values)
+				//{
+				//	var current = visToken.currentGridPos;
+				//	visToken.currentGridPos = visToken.original.GridPosition;
+				//	if (current != visToken.currentGridPos)
+				//	{
+				//		var tween = GetTree().CreateTween();
+				//		tween.TweenProperty(visToken.fakeVisual, "global_position", board[visToken.currentGridPos.X, visToken.currentGridPos.Y].GlobalPosition, 0.15f)
+				//			.SetEase(Tween.EaseType.InOut)
+				//			.SetTrans(Tween.TransitionType.Sine);
+				//	}
+				//}
+				return;
+			}
+
+			if (tile != draggedToken && !tempVisTokens.ContainsKey(tile))
+			{
+				var visToken = new TempVisToken()
+				{
+					original = tile,
+					fakeVisual = CreateTemporaryToken(tile.TokenType),
+					currentGridPos = tile.GridPosition
+				};
+				visToken.fakeVisual.GlobalPosition = tile.GlobalPosition;
+				tempVisTokens.Add(tile, visToken);
+
+				tile.SelfModulate = Color.FromHsv(0, 0, 0, 0);
+			}
+
+			foreach (var visToken in tempVisTokens.Values)
+			{
+				var originalPos = visToken.original.GridPosition;
+				var currentPos = visToken.currentGridPos;
+				if (hoverPosition == draggedToken.GridPosition)
+				{
+					visToken.currentGridPos = originalPos;
+				} else 
+				//token is currently at its origin. check whether it should move away.
+				//this should only ever be the case when the tile is currently being hovered over.
+				if (visToken.currentGridPos == originalPos && hoverPosition == originalPos)
+				{
+					//just need to figure out whether to move up, down, left, or right
+					if (dragStartPos.Y == originalPos.Y)
+					{
+						if (dragStartPos.X < originalPos.X) //dragged from left to right. should move left.
+						{
+							visToken.currentGridPos += new Vector2I(-1, 0);
+						}
+						else //dragged from right to left. should move right.
+						{
+							visToken.currentGridPos += new Vector2I(1, 0);
+						}
+					}
+					else if (dragStartPos.X == originalPos.X)
+					{
+						if (dragStartPos.Y < originalPos.Y) //dragged from top to bottom. should move up.
+						{
+							visToken.currentGridPos += new Vector2I(0, -1);
+						}
+						else //dragged from bottom to top. should move down
+						{
+							visToken.currentGridPos += new Vector2I(0, 1);
+						}
+					}
+				}
+				else //token was moved out of the way. check whether it may go back.
+				{
+					if (dragStartPos.Y == originalPos.Y)
+					{
+						//for a column.
+						if (dragStartPos.X < originalPos.X && hoverPosition.X < originalPos.X) 
+						{
+							visToken.currentGridPos = originalPos;
+						}
+						else if (dragStartPos.X > originalPos.X && hoverPosition.X > originalPos.X)
+						{
+							visToken.currentGridPos = originalPos;
+						}
+					}
+					else if (dragStartPos.X == originalPos.X)
+					{
+						//for a row
+						if (dragStartPos.Y < originalPos.Y && hoverPosition.Y < originalPos.Y)
+						{
+							visToken.currentGridPos = originalPos;
+						}
+						else if (dragStartPos.Y > originalPos.Y && hoverPosition.Y > originalPos.Y)
+						{
+							visToken.currentGridPos = originalPos;
+						}
+					}
+				}
+				if (visToken.currentGridPos != currentPos)
+				{
+					//GD.Print("Start tween");
+					//GD.Print($"From {originalPos} to {visToken.currentGridPos}");
+					var tween = GetTree().CreateTween();
+					tween.TweenProperty(visToken.fakeVisual, "global_position", board[visToken.currentGridPos.X, visToken.currentGridPos.Y].GlobalPosition, 0.15f)
+						.SetEase(Tween.EaseType.InOut)
+						.SetTrans(Tween.TransitionType.Sine);
+				}
+			}
 		}
 	}
 
-	private TokenType[,] snapshot;
-	private ulong randomState;
+	private TextureRect CreateTemporaryToken(TokenType type)
+	{
+		var val = new TextureRect
+		{
+			Texture = tokenTexture,
+			MouseFilter = MouseFilterEnum.Ignore,
+			CustomMinimumSize = new(50, 50),
+			StretchMode = TextureRect.StretchModeEnum.KeepAspect,
+			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+			SelfModulate = tokenColors[(int)type]
+		};
+		AddChild(val);
+		return val;
+	}
 
-	public void _OnSnapshotButtonDown()
+	private class TempVisToken
+	{
+		public BoardToken original;
+		public TextureRect fakeVisual;
+		public Vector2I currentGridPos;
+	}
+
+	public void OnSnapshotButtonDown()
 	{
 		snapshot = new TokenType[boardSize, boardSize];
 		for (int x = 0; x < boardSize; x++)
@@ -456,7 +574,7 @@ public partial class BoardController : Panel
 		randomState = rand.State;
 	}
 
-	public void _OnReloadButtonDown()
+	public void OnReloadButtonDown()
 	{
 		if (!acceptsInput)
 			return;

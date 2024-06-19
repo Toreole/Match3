@@ -591,5 +591,5 @@ offset_right = 313.0
 offset_bottom = 214.0
 text = "Reload Snapshot"
 
-[connection signal="button_down" from="SnapshotButton" to="Board_Area" method="_OnSnapshotButtonDown"]
-[connection signal="button_down" from="ReloadButton" to="Board_Area" method="_OnReloadButtonDown"]
+[connection signal="button_down" from="SnapshotButton" to="Board_Area" method="OnSnapshotButtonDown"]
+[connection signal="button_down" from="ReloadButton" to="Board_Area" method="OnReloadButtonDown"]
