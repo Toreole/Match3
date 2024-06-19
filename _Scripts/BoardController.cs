@@ -128,9 +128,36 @@ public partial class BoardController : Panel
 	{
 		if (!acceptsInput)
 			return;
+		var tilePos = token.GridPosition;
+		//init vistokens
+		for (int x = 0; x < boardSize; x++)
+		{
+			if (x == tilePos.X) continue;
+			tempVisTokens.Add(CreateVisToken(board[x, tilePos.Y]));
+		}
+		for (int y = 0;  y < boardSize; y++)
+		{
+			if (y == tilePos.Y) continue;
+			tempVisTokens.Add(CreateVisToken(board[tilePos.X, y]));
+		}
+
 		draggedToken = token;
 		imposter.Visible = true;
 		imposter.SelfModulate = draggedToken.SelfModulate;
+		draggedToken.SelfModulate = Color.FromHsv(0, 0, 0, 0);
+	}
+
+	private TempVisToken CreateVisToken(BoardToken tile)
+	{
+		var visToken = new TempVisToken()
+		{
+			original = tile,
+			fakeVisual = CreateTemporaryToken(tile.TokenType),
+			currentGridPos = tile.GridPosition
+		};
+		visToken.fakeVisual.GlobalPosition = tile.GlobalPosition;
+		tile.SelfModulate = Color.FromHsv(0, 0, 0, 0);
+		return visToken;
 	}
 
 	internal async Task EndTokenDrag(BoardToken target)
@@ -138,10 +165,10 @@ public partial class BoardController : Panel
 		if (!acceptsInput || draggedToken == null)
 			return;
 
-		foreach (var pair in tempVisTokens)
+		foreach (var visToken in tempVisTokens)
 		{
-			pair.Key.SelfModulate = tokenColors[(int)pair.Key.TokenType];
-			pair.Value.fakeVisual.QueueFree();
+			visToken.original.SelfModulate = tokenColors[(int)visToken.original.TokenType];
+			visToken.fakeVisual.QueueFree();
 		}
 		tempVisTokens.Clear();
 
@@ -153,12 +180,13 @@ public partial class BoardController : Panel
 		//same position, or they dont share any coordinate
 		if (startPos == endPos || (startPos.X != endPos.X && startPos.Y != endPos.Y))
 		{
+			draggedToken.SelfModulate = tokenColors[(int)draggedToken.TokenType];
 			draggedToken = null;
 			return;
 		}
 
-		var tokenColor = draggedToken.SelfModulate;
 		var tokenType = draggedToken.TokenType;
+		var tokenColor = tokenColors[(int)tokenType];
 
 		acceptsInput = false;
 
@@ -414,7 +442,7 @@ public partial class BoardController : Panel
 		board[x, y].SelfModulate = Color.FromHsv(0, 0, 0, 0);
 	}
 
-	private Dictionary<BoardToken, TempVisToken> tempVisTokens = new();
+	private List<TempVisToken> tempVisTokens = new();
 
 	internal void SetCurrentHover(BoardToken tile)
 	{
@@ -453,21 +481,7 @@ public partial class BoardController : Panel
 				return;
 			}
 
-			if (tile != draggedToken && !tempVisTokens.ContainsKey(tile))
-			{
-				var visToken = new TempVisToken()
-				{
-					original = tile,
-					fakeVisual = CreateTemporaryToken(tile.TokenType),
-					currentGridPos = tile.GridPosition
-				};
-				visToken.fakeVisual.GlobalPosition = tile.GlobalPosition;
-				tempVisTokens.Add(tile, visToken);
-
-				tile.SelfModulate = Color.FromHsv(0, 0, 0, 0);
-			}
-
-			foreach (var visToken in tempVisTokens.Values)
+			foreach (var visToken in tempVisTokens)
 			{
 				var originalPos = visToken.original.GridPosition;
 				var currentPos = visToken.currentGridPos;
@@ -477,29 +491,29 @@ public partial class BoardController : Panel
 				} else 
 				//token is currently at its origin. check whether it should move away.
 				//this should only ever be the case when the tile is currently being hovered over.
-				if (visToken.currentGridPos == originalPos && hoverPosition == originalPos)
+				if (visToken.currentGridPos == originalPos)
 				{
 					//just need to figure out whether to move up, down, left, or right
 					if (dragStartPos.Y == originalPos.Y)
 					{
-						if (dragStartPos.X < originalPos.X) //dragged from left to right. should move left.
+						if (dragStartPos.X < originalPos.X && hoverPosition.X >= originalPos.X) //dragged from left to right. should move left.
 						{
-							visToken.currentGridPos += new Vector2I(-1, 0);
+							visToken.currentGridPos = originalPos + new Vector2I(-1, 0);
 						}
-						else //dragged from right to left. should move right.
+						else if (dragStartPos.X > originalPos.X && hoverPosition.X <= originalPos.X) //dragged from right to left. should move right.
 						{
-							visToken.currentGridPos += new Vector2I(1, 0);
+							visToken.currentGridPos = originalPos + new Vector2I(1, 0);
 						}
 					}
 					else if (dragStartPos.X == originalPos.X)
 					{
-						if (dragStartPos.Y < originalPos.Y) //dragged from top to bottom. should move up.
+						if (dragStartPos.Y < originalPos.Y && hoverPosition.Y >= originalPos.Y) //dragged from top to bottom. should move up.
 						{
-							visToken.currentGridPos += new Vector2I(0, -1);
+							visToken.currentGridPos = originalPos + new Vector2I(0, -1);
 						}
-						else //dragged from bottom to top. should move down
+						else if (dragStartPos.Y > originalPos.Y && hoverPosition.Y <= originalPos.Y)//dragged from bottom to top. should move down
 						{
-							visToken.currentGridPos += new Vector2I(0, 1);
+							visToken.currentGridPos = originalPos + new Vector2I(0, 1);
 						}
 					}
 				}
