@@ -129,7 +129,7 @@ public partial class BoardController : Panel
 		if (!acceptsInput)
 			return;
 		var tilePos = token.GridPosition;
-		//init vistokens
+		//init vistokens for move.
 		for (int x = 0; x < boardSize; x++)
 		{
 			if (x == tilePos.X) continue;
@@ -165,6 +165,7 @@ public partial class BoardController : Panel
 		if (!acceptsInput || draggedToken == null)
 			return;
 
+		//cleanup tempVisTokens at end of move.
 		foreach (var visToken in tempVisTokens)
 		{
 			visToken.original.SelfModulate = tokenColors[(int)visToken.original.TokenType];
@@ -456,74 +457,59 @@ public partial class BoardController : Panel
 				hoveringTile.Modulate = Color.FromHsv(0, 0, 0.8f);
 				GD.Print($"Now hovering over {tile.Name}");
 			}
+			return;
 		}
-		else if (acceptsInput) // currently dragging a token. animate other tokens on its path to preemptively move
+		if (!acceptsInput)
+			return;
+		UpdateTempVisTokens(tile.GridPosition);
+	}
+
+	private void UpdateTempVisTokens(Vector2I hoverPosition)
+	{
+		// currently dragging a token. animate other tokens on its path to preemptively move
+		var dragStartPos = draggedToken.GridPosition;
+		//skip if they dont share a lane.
+		if (dragStartPos.X != hoverPosition.X && dragStartPos.Y != hoverPosition.Y)
+			return;
+
+		foreach (var visToken in tempVisTokens)
 		{
-			var dragStartPos = draggedToken.GridPosition;
-			var hoverPosition = tile.GridPosition;
-
-			//skip if they dont share a lane.
-			if (dragStartPos.X != hoverPosition.X && dragStartPos.Y != hoverPosition.Y)
+			var originalPos = visToken.original.GridPosition;
+			var currentPos = visToken.currentGridPos;
+			if (hoverPosition == draggedToken.GridPosition)
 			{
-				// BIG TODO:
-				//foreach (var visToken in tempVisTokens.Values)
-				//{
-				//	var current = visToken.currentGridPos;
-				//	visToken.currentGridPos = visToken.original.GridPosition;
-				//	if (current != visToken.currentGridPos)
-				//	{
-				//		var tween = GetTree().CreateTween();
-				//		tween.TweenProperty(visToken.fakeVisual, "global_position", board[visToken.currentGridPos.X, visToken.currentGridPos.Y].GlobalPosition, 0.15f)
-				//			.SetEase(Tween.EaseType.InOut)
-				//			.SetTrans(Tween.TransitionType.Sine);
-				//	}
-				//}
-				return;
+				visToken.currentGridPos = originalPos;
 			}
-
-			foreach (var visToken in tempVisTokens)
+			// set new position for tile when necessary.
+			else if (dragStartPos.Y == originalPos.Y)
 			{
-				var originalPos = visToken.original.GridPosition;
-				var currentPos = visToken.currentGridPos;
-				if (hoverPosition == draggedToken.GridPosition)
+				if (dragStartPos.X < originalPos.X) //dragged from left to right. should move left.
 				{
-					visToken.currentGridPos = originalPos;
+					visToken.currentGridPos = (hoverPosition.X >= originalPos.X) ? (originalPos + new Vector2I(-1, 0)) : originalPos;
 				}
-				//token is currently at its origin. check whether it should move away.
-				//this should only ever be the case when the tile is currently being hovered over.
-				//just need to figure out whether to move up, down, left, or right
-				else if (dragStartPos.Y == originalPos.Y)
+				else if (dragStartPos.X > originalPos.X) //dragged from right to left. should move right.
 				{
-					if (dragStartPos.X < originalPos.X) //dragged from left to right. should move left.
-					{
-						visToken.currentGridPos = (hoverPosition.X >= originalPos.X) ? (originalPos + new Vector2I(-1, 0)) : originalPos;
-					}
-					else if (dragStartPos.X > originalPos.X ) //dragged from right to left. should move right.
-					{
-						visToken.currentGridPos = (hoverPosition.X <= originalPos.X) ? (originalPos + new Vector2I(1, 0)) : originalPos;
-					}
+					visToken.currentGridPos = (hoverPosition.X <= originalPos.X) ? (originalPos + new Vector2I(1, 0)) : originalPos;
 				}
-				else //if (dragStartPos.X == originalPos.X) //condition is guaranteed by precondition above.
+			}
+			else //if (dragStartPos.X == originalPos.X) //condition is guaranteed by precondition above.
+			{
+				if (dragStartPos.Y < originalPos.Y) //dragged from top to bottom. should move up.
 				{
-					if (dragStartPos.Y < originalPos.Y ) //dragged from top to bottom. should move up.
-					{
-						visToken.currentGridPos = (hoverPosition.Y >= originalPos.Y) ? (originalPos + new Vector2I(0, -1)) : originalPos;
-					}
-					else if (dragStartPos.Y > originalPos.Y)//dragged from bottom to top. should move down
-					{
-						visToken.currentGridPos = (hoverPosition.Y <= originalPos.Y)? (originalPos + new Vector2I(0, 1)) : originalPos;
-					}
+					visToken.currentGridPos = (hoverPosition.Y >= originalPos.Y) ? (originalPos + new Vector2I(0, -1)) : originalPos;
 				}
-				
-				if (visToken.currentGridPos != currentPos)
+				else if (dragStartPos.Y > originalPos.Y)//dragged from bottom to top. should move down
 				{
-					//GD.Print("Start tween");
-					//GD.Print($"From {originalPos} to {visToken.currentGridPos}");
-					var tween = GetTree().CreateTween();
-					tween.TweenProperty(visToken.fakeVisual, "global_position", board[visToken.currentGridPos.X, visToken.currentGridPos.Y].GlobalPosition, 0.15f)
-						.SetEase(Tween.EaseType.InOut)
-						.SetTrans(Tween.TransitionType.Sine);
+					visToken.currentGridPos = (hoverPosition.Y <= originalPos.Y) ? (originalPos + new Vector2I(0, 1)) : originalPos;
 				}
+			}
+			// check for change, animate to new position.
+			if (visToken.currentGridPos != currentPos)
+			{
+				var tween = GetTree().CreateTween();
+				tween.TweenProperty(visToken.fakeVisual, "global_position", board[visToken.currentGridPos.X, visToken.currentGridPos.Y].GlobalPosition, 0.15f)
+					.SetEase(Tween.EaseType.InOut)
+					.SetTrans(Tween.TransitionType.Sine);
 			}
 		}
 	}
