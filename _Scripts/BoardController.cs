@@ -47,13 +47,7 @@ public partial class BoardController : Panel
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
-		imposter = new();
-		this.AddChild(imposter);
-		imposter.Texture = tokenTexture;
-		imposter.MouseFilter = MouseFilterEnum.Ignore;
-		imposter.CustomMinimumSize = new(50, 50);
-		imposter.StretchMode = TextureRect.StretchModeEnum.KeepAspect;
-		imposter.ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize;
+		imposter = CreateUninteractableTokenAsChild();
 		imposter.Visible = false;
 
 		preferredToken = (TokenType)rand.RandiRange(0, 3);
@@ -159,6 +153,19 @@ public partial class BoardController : Panel
 		tile.SelfModulate = Color.FromHsv(0, 0, 0, 0);
 		return visToken;
 	}
+	private TextureRect CreateUninteractableTokenAsChild()
+	{
+		var rect = new TextureRect
+		{
+			Texture = tokenTexture,
+			MouseFilter = MouseFilterEnum.Ignore,
+			CustomMinimumSize = new(50, 50),
+			StretchMode = TextureRect.StretchModeEnum.KeepAspect,
+			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize
+		};
+		AddChild(rect);
+		return rect;
+	}
 
 	internal async Task EndTokenDrag(BoardToken target)
 	{
@@ -213,18 +220,18 @@ public partial class BoardController : Panel
 		{
 			ScoreMatches(matches);
 			await ApplyGravity(matches);
-			await RefillEmptyTiles();
+			RefillEmptyTiles(); //refill takes 0.8s
 
 			//continue chains as long as matches exist.
 			int iteration = 0;
 			while (matches.Count > 0)
 			{
-				await Task.Delay(600);
+				await Task.Delay(900);
 				GD.Print($"FindAllMatches({iteration++})");
 				matches = FindAllMatches();
 				ScoreMatches(matches);
 				await ApplyGravity(matches);
-				await RefillEmptyTiles();
+				RefillEmptyTiles(); //refill takes 0.8s
 			}
 
 		}
@@ -291,44 +298,45 @@ public partial class BoardController : Panel
 			//matchType and matchSize together determine what you get for a match.
 			int matchSize = 1 + ysize + xsize;
 
-			if(isMatch)
+			if (!isMatch)
+				continue;
+			
+			matches.Add(new()
 			{
-				matches.Add(new()
+				totalSize = matchSize,
+				pos = new(posX, posY),
+				xSize = xsize + 1,
+				ySize = ysize + 1,
+				xOffset = xoffset,
+				yOffset = yoffset,
+				tokenType = matchType
+			});
+			GD.Print($"Found match around ({posX}, {posY}) with sizes ({xsize}, {ysize}) and token {matchType}");
+			if (xsize >= 2)
+			{
+				for(int dx = 0; dx <= xsize; dx++)
 				{
-					totalSize = matchSize,
-					pos = new(posX, posY),
-					xSize = xsize + 1,
-					ySize = ysize + 1,
-					xOffset = xoffset,
-					yOffset = yoffset,
-					tokenType = matchType
-				});
-				GD.Print($"Found match around ({posX}, {posY}) with sizes ({xsize}, {ysize}) and token {matchType}");
-				if (xsize >= 2)
-				{
-					for(int dx = 0; dx <= xsize; dx++)
-					{
-						int x = posX + xoffset + dx;
-						//GD.Print($"empty ({x}, {start.Y})");
-						EmptyTile(x, posY);
-					}
-				}
-				if (ysize >= 2)
-				{
-					for (int dy = 0; dy <= ysize; dy++)
-					{
-						int y = posY + yoffset + dy;
-						//GD.Print($"empty ({start.X}, {y})");
-						EmptyTile(posX, y);
-					}
+					int x = posX + xoffset + dx;
+					//GD.Print($"empty ({x}, {start.Y})");
+					EmptyTile(x, posY);
 				}
 			}
+			if (ysize >= 2)
+			{
+				for (int dy = 0; dy <= ysize; dy++)
+				{
+					int y = posY + yoffset + dy;
+					//GD.Print($"empty ({start.X}, {y})");
+					EmptyTile(posX, y);
+				}
+			}
+			
 		}
 		return matches;
 	}
 
 	//searches through the rows and randomizes any empty tiles as other tokens.
-	private async Task RefillEmptyTiles()
+	private void RefillEmptyTiles()
 	{
 		bool rowHadEmpty;
 		for(int y = 0; y < boardSize; y++)
@@ -336,37 +344,33 @@ public partial class BoardController : Panel
 			rowHadEmpty = false;
 			for(int x = 0; x < boardSize; x++)
 			{
-				if (board[x,y].TokenType == TokenType.Empty)
-				{
-					var tokenColor = GetRandomTokenColor(out var tokenType);
-					//tween in a new token
-					TextureRect rec = new()
-					{
-						Texture = tokenTexture,
-						SelfModulate = tokenColor,
-						CustomMinimumSize = board[x,y].CustomMinimumSize,
-						StretchMode = board[x,y].StretchMode,
-						ExpandMode = board[x,y].ExpandMode,
-					};
-					AddChild(rec);
-					rec.GlobalPosition = board[x, y].GlobalPosition + new Vector2(0, -500);
-					var tween = GetTree().CreateTween();
-					tween.TweenProperty(rec, "global_position", board[x, y].GlobalPosition, 0.8f).SetEase(Tween.EaseType.InOut).SetTrans(Tween.TransitionType.Sine);
-					tween.TweenCallback(Callable.From(rec.QueueFree));
-					int bufferx = x, buffery = y;
-					tween.TweenCallback(Callable.From(() => {
-						board[bufferx, buffery].SelfModulate = tokenColor;
-						board[bufferx, buffery].TokenType = tokenType;
-					}));
+				if (board[x, y].TokenType != TokenType.Empty)
+					continue;
+				
+				var tokenColor = GetRandomTokenColor(out var tokenType);
+				//tween in a new token
+				TextureRect rec = CreateUninteractableTokenAsChild();
+				rec.SelfModulate = tokenColor;
+				rec.GlobalPosition = board[x, y].GlobalPosition + new Vector2(0, -500);
 
-					rowHadEmpty = true;
-					//await Task.Delay(200);
-				}
+				var tween = GetTree().CreateTween();
+				tween.TweenProperty(rec, "global_position", board[x, y].GlobalPosition, 0.8f)
+					.SetEase(Tween.EaseType.InOut)
+					.SetTrans(Tween.TransitionType.Sine);
+				tween.TweenCallback(Callable.From(rec.QueueFree));
+				int bufferx = x, buffery = y;
+				tween.TweenCallback(Callable.From(() => {
+					board[bufferx, buffery].SelfModulate = tokenColor;
+					board[bufferx, buffery].TokenType = tokenType;
+				}));
+
+				rowHadEmpty = true;
+				//await Task.Delay(200);
+				
 			}
 			if (!rowHadEmpty)
 				return;
 		}
-		await Task.Delay(1000);
 	}
 
 	//just grants scores and bonuses etc. depending on match type and match size.
@@ -406,35 +410,38 @@ public partial class BoardController : Panel
 	//the list of matches can be used to generate a list of tokens to move down based on y positions.
 	private async Task ApplyGravity(List<TokenMatch> matches)
 	{
-		await Task.Delay(600);
 		matches.Sort((a, b) => a.pos.Y.CompareTo(b.pos.Y));
 		//move tokens above the match down by the matches (ysize + 1)
 		foreach(var match in matches)
 		{
 			for(int x = match.pos.X + match.xOffset; x < match.pos.X + match.xOffset + match.xSize; x++)
 			{
-				if (x == match.pos.X)
+				for (int y = match.pos.Y + ((x == match.pos.X) ? match.yOffset : 0) - 1; y >= 0; y--)
 				{
-					for (int y = match.pos.Y + match.yOffset - 1; y >= 0; y--)
-					{
-						board[x, y + match.ySize].TokenType = board[x, y].TokenType;
-						board[x, y + match.ySize].SelfModulate = board[x, y].SelfModulate;
+					var rec = CreateUninteractableTokenAsChild();
+					rec.SelfModulate = board[x, y].SelfModulate;
+					rec.GlobalPosition = board[x, y].GlobalPosition;
 
-						EmptyTile(x, y);
-					}
+					int xbuffer = x, ybuffer = y + ((x == match.pos.X)? match.ySize : 1);
+					var tokenType = board[x, y].TokenType;
+
+					var tween = GetTree().CreateTween();
+					tween.TweenProperty(rec, "global_position", board[xbuffer, ybuffer].GlobalPosition, 0.2)
+						.SetEase(Tween.EaseType.InOut)
+						.SetTrans(Tween.TransitionType.Sine);
+					tween.TweenCallback(Callable.From(() => {
+						board[xbuffer, ybuffer].SelfModulate = tokenColors[(int)tokenType];
+					}));
+					tween.TweenCallback(Callable.From(rec.QueueFree));
+
+					board[xbuffer, ybuffer].TokenType = tokenType;
+					//board[xbuffer, ybuffer].SelfModulate = board[x, y].SelfModulate;
+
+					EmptyTile(x, y);
 				}
-				else
-				{
-					for (int y = match.pos.Y - 1; y >= 0; y--)
-					{
-						board[x, y + 1].TokenType = board[x, y].TokenType;
-						board[x, y + 1].SelfModulate = board[x, y].SelfModulate;
-						EmptyTile(x, y);
-					}
-				}
-				await Task.Delay(600);
 			}
 		}
+		await Task.Delay(300);
 	}
 
 	private void EmptyTile(int x, int y)

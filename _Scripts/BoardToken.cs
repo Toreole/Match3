@@ -24,7 +24,7 @@ public partial class BoardToken : TextureRect
 		if(data.VariantType == Variant.Type.StringName)
 		{
 			GD.Print($"{Name}: drop received from {data.AsString()}");
-			BoardController.EndTokenDrag(this).ConfigureAwait(false);
+			BoardController.EndTokenDrag(this);
 		}
 	}
 
