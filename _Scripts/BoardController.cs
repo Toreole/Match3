@@ -488,62 +488,33 @@ public partial class BoardController : Panel
 				if (hoverPosition == draggedToken.GridPosition)
 				{
 					visToken.currentGridPos = originalPos;
-				} else 
+				}
 				//token is currently at its origin. check whether it should move away.
 				//this should only ever be the case when the tile is currently being hovered over.
-				if (visToken.currentGridPos == originalPos)
+				//just need to figure out whether to move up, down, left, or right
+				else if (dragStartPos.Y == originalPos.Y)
 				{
-					//just need to figure out whether to move up, down, left, or right
-					if (dragStartPos.Y == originalPos.Y)
+					if (dragStartPos.X < originalPos.X) //dragged from left to right. should move left.
 					{
-						if (dragStartPos.X < originalPos.X && hoverPosition.X >= originalPos.X) //dragged from left to right. should move left.
-						{
-							visToken.currentGridPos = originalPos + new Vector2I(-1, 0);
-						}
-						else if (dragStartPos.X > originalPos.X && hoverPosition.X <= originalPos.X) //dragged from right to left. should move right.
-						{
-							visToken.currentGridPos = originalPos + new Vector2I(1, 0);
-						}
+						visToken.currentGridPos = (hoverPosition.X >= originalPos.X) ? (originalPos + new Vector2I(-1, 0)) : originalPos;
 					}
-					else if (dragStartPos.X == originalPos.X)
+					else if (dragStartPos.X > originalPos.X ) //dragged from right to left. should move right.
 					{
-						if (dragStartPos.Y < originalPos.Y && hoverPosition.Y >= originalPos.Y) //dragged from top to bottom. should move up.
-						{
-							visToken.currentGridPos = originalPos + new Vector2I(0, -1);
-						}
-						else if (dragStartPos.Y > originalPos.Y && hoverPosition.Y <= originalPos.Y)//dragged from bottom to top. should move down
-						{
-							visToken.currentGridPos = originalPos + new Vector2I(0, 1);
-						}
+						visToken.currentGridPos = (hoverPosition.X <= originalPos.X) ? (originalPos + new Vector2I(1, 0)) : originalPos;
 					}
 				}
-				else //token was moved out of the way. check whether it may go back.
+				else //if (dragStartPos.X == originalPos.X) //condition is guaranteed by precondition above.
 				{
-					if (dragStartPos.Y == originalPos.Y)
+					if (dragStartPos.Y < originalPos.Y ) //dragged from top to bottom. should move up.
 					{
-						//for a column.
-						if (dragStartPos.X < originalPos.X && hoverPosition.X < originalPos.X) 
-						{
-							visToken.currentGridPos = originalPos;
-						}
-						else if (dragStartPos.X > originalPos.X && hoverPosition.X > originalPos.X)
-						{
-							visToken.currentGridPos = originalPos;
-						}
+						visToken.currentGridPos = (hoverPosition.Y >= originalPos.Y) ? (originalPos + new Vector2I(0, -1)) : originalPos;
 					}
-					else if (dragStartPos.X == originalPos.X)
+					else if (dragStartPos.Y > originalPos.Y)//dragged from bottom to top. should move down
 					{
-						//for a row
-						if (dragStartPos.Y < originalPos.Y && hoverPosition.Y < originalPos.Y)
-						{
-							visToken.currentGridPos = originalPos;
-						}
-						else if (dragStartPos.Y > originalPos.Y && hoverPosition.Y > originalPos.Y)
-						{
-							visToken.currentGridPos = originalPos;
-						}
+						visToken.currentGridPos = (hoverPosition.Y <= originalPos.Y)? (originalPos + new Vector2I(0, 1)) : originalPos;
 					}
 				}
+				
 				if (visToken.currentGridPos != currentPos)
 				{
 					//GD.Print("Start tween");
